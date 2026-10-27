@@ -1,4 +1,9 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
+import EditCohortPage from './EditCohortPage'
+import UserManagementPage from './UserManagementPage'
+import RolesAndPermissionsPage from './RolesAndPermissionsPage'
+import AccessManagementSubView from './AccessManagementSubViews'
+import CompetitionManagementPage from './CompetitionManagementPage'
 import {
   Home,
   Activity,
@@ -44,21 +49,34 @@ import {
   Copy,
   BookOpen,
   User,
+  Users,
+  KeyRound,
+  Monitor,
+  Headphones,
+  UserCheck,
+  Fingerprint,
   Check,
   Play,
   Maximize2,
   Presentation,
   FileSpreadsheet,
   Trash,
-  Star
+  Star,
+  Trophy
 } from 'lucide-react'
 
-interface NavItem {
+export interface SubNavRecord {
+  id: string
+  label: string
+  icon?: any
+}
+
+export interface NavItem {
   id: string
   label: string
   icon: any
   hasSubmenu?: boolean
-  subItems?: string[]
+  subItems?: (string | SubNavRecord)[]
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -73,13 +91,42 @@ const NAV_ITEMS: NavItem[] = [
   },
   { id: 'placement', label: 'Placement', icon: Briefcase, hasSubmenu: true },
   { id: 'communication', label: 'Communication', icon: MessageSquare, hasSubmenu: true },
-  { id: 'student-experience', label: 'Student Experience', icon: Sparkles, hasSubmenu: true },
+  {
+    id: 'student-experience',
+    label: 'Student Experience',
+    icon: Sparkles,
+    hasSubmenu: true,
+    subItems: [
+      { id: 'student-dashboard', label: 'Dashboard', icon: Home },
+      { id: 'student-events', label: 'Events', icon: Calendar },
+      { id: 'student-clubs', label: 'Clubs', icon: Users },
+      { id: 'student-feeds', label: 'Feeds', icon: MessageSquare },
+      { id: 'student-polls', label: 'Polls', icon: BarChart2 },
+      { id: 'student-competitions', label: 'Competitions', icon: Trophy }
+    ]
+  },
   { id: 'review-request', label: 'Review Request', icon: ClipboardCheck },
   { id: 'student-interface', label: 'Student Interface', icon: FileText },
   { id: 'help-support', label: 'Help & Support', icon: LifeBuoy, hasSubmenu: true },
   { id: 'analytics', label: 'Analytics', icon: BarChart2, hasSubmenu: true },
-  { id: 'access-management', label: 'Access Management', icon: ShieldCheck, hasSubmenu: true },
+  {
+    id: 'access-management',
+    label: 'Access Management',
+    icon: ShieldCheck,
+    hasSubmenu: true,
+    subItems: [
+      { id: 'user-management', label: 'User Management', icon: Users },
+      { id: 'roles-permission', label: 'Roles and Permission', icon: KeyRound },
+      { id: 'team-setup', label: 'Team Setup', icon: Users },
+      { id: 'user-active-session', label: 'User Active Session', icon: Monitor },
+      { id: 'help-desk', label: 'Help Desk', icon: Headphones },
+      { id: 'impersonation-logs', label: 'Impersonation Logs', icon: UserCheck },
+      { id: 'user-active-session-logs', label: 'User Active Session Logs', icon: Activity },
+      { id: 'biometric-logs', label: 'Biometric Logs', icon: Fingerprint }
+    ]
+  },
   { id: 'category-management', label: 'Category Management', icon: CreditCard },
+  { id: 'coach-forms', label: 'Coach Forms', icon: FileText },
   { id: 'system-settings', label: 'System Settings', icon: Settings, hasSubmenu: true },
 ]
 
@@ -881,8 +928,9 @@ function getInitialNavigation() {
 export default function App() {
   const initialNav = getInitialNavigation()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const [activeTab, setActiveTab] = useState('academics')
-  const [expandedSubmenu, setExpandedSubmenu] = useState<string | null>('academics')
+  const [activeTab, setActiveTab] = useState(() => (initialNav.prog ? 'academics' : 'student-experience'))
+  const [expandedSubmenu, setExpandedSubmenu] = useState<string | null>(() => (initialNav.prog ? 'academics' : 'student-experience'))
+  const [activeSubItem, setActiveSubItem] = useState<string>(() => (initialNav.prog ? 'Program List' : 'Competitions'))
   const [searchTableQuery, setSearchTableQuery] = useState('')
   const [searchCohortQuery, setSearchCohortQuery] = useState('')
   const [searchCourseQuery, setSearchCourseQuery] = useState('')
@@ -893,6 +941,7 @@ export default function App() {
   const [selectedTerm, setSelectedTerm] = useState(initialNav.term)
   const [selectedSection, setSelectedSection] = useState(initialNav.section)
   const [selectedCourse, setSelectedCourse] = useState<CourseItem | null>(initialNav.course)
+  const [isEditingCohort, setIsEditingCohort] = useState(false)
   const [activeCourseTab, setActiveCourseTab] = useState<string>('sessions')
   const [selectedSessionId, setSelectedSessionId] = useState<string>('s1')
   const currentSession =
@@ -1105,6 +1154,13 @@ export default function App() {
     c.faculty.toLowerCase().includes(searchCourseQuery.toLowerCase())
   )
 
+  const normalizedSessionQuery = searchSessionQuery.trim().toLowerCase()
+  const filteredSessions = DEFAULT_SESSIONS.filter(session =>
+    session.title.toLowerCase().includes(normalizedSessionQuery) ||
+    session.topic.toLowerCase().includes(normalizedSessionQuery) ||
+    `session ${session.sessionNum}`.includes(normalizedSessionQuery)
+  )
+
   return (
     <div className="h-screen bg-[#f8fafc] text-slate-700 flex flex-col font-sans overflow-hidden">
       {/* Top Header Navbar */}
@@ -1169,7 +1225,7 @@ export default function App() {
           <button className="relative p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors">
             <Bell className="h-4 w-4" />
             <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-teal-600 text-[10px] font-bold text-white ring-2 ring-white">
-              24
+              42
             </span>
           </button>
 
@@ -1262,42 +1318,64 @@ export default function App() {
 
                     {/* Submenu in expanded mode */}
                     {isSidebarOpen && isSubmenuOpen && item.subItems && (
-                      <div className="bg-slate-50/70 border-y border-gray-100/80 py-1 pl-10 pr-3 space-y-0.5">
+                      <div className="bg-white border-y border-gray-100 py-1 pl-6 pr-3 space-y-0.5">
                         {item.subItems.map((sub, idx) => {
+                          const subLabel = typeof sub === 'string' ? sub : sub.label
+                          const SubIcon = typeof sub === 'string' ? null : sub.icon
                           const isSubActive =
-                            (sub === 'Program List' && !selectedProgram) ||
-                            (sub === 'Program Management' && !selectedProgram) ||
-                            (sub === 'Cohorts' && selectedProgram && !selectedCohort) ||
-                            (sub === 'Curriculum' && selectedCohort)
+                            item.id === 'access-management'
+                              ? activeTab === 'access-management' && activeSubItem === subLabel
+                              : item.id === 'student-experience'
+                                ? activeTab === 'student-experience' && activeSubItem === subLabel
+                                : (subLabel === 'Program List' && !selectedProgram) ||
+                                (subLabel === 'Program Management' && !selectedProgram) ||
+                                (subLabel === 'Cohorts' && selectedProgram && !selectedCohort) ||
+                                (subLabel === 'Curriculum' && selectedCohort)
                           return (
                             <button
                               key={idx}
                               onClick={() => {
-                                if (sub === 'Program Management' || sub === 'Program List') {
-                                  setSelectedProgram(null)
-                                  setSelectedCohort(null)
-                                  setSelectedCourse(null)
-                                } else if (sub === 'Cohorts') {
-                                  if (!selectedProgram) {
-                                    setSelectedProgram(INITIAL_PROGRAMS[1])
+                                if (item.id === 'access-management') {
+                                  setActiveTab('access-management')
+                                  setActiveSubItem(subLabel)
+                                } else if (item.id === 'academics') {
+                                  setActiveTab('academics')
+                                  if (subLabel === 'Program Management' || subLabel === 'Program List') {
+                                    setSelectedProgram(null)
+                                    setSelectedCohort(null)
+                                    setSelectedCourse(null)
+                                  } else if (subLabel === 'Cohorts') {
+                                    if (!selectedProgram) {
+                                      setSelectedProgram(INITIAL_PROGRAMS[1])
+                                    }
+                                    setSelectedCohort(null)
+                                    setSelectedCourse(null)
+                                  } else if (subLabel === 'Curriculum') {
+                                    const prog = selectedProgram || INITIAL_PROGRAMS[1]
+                                    setSelectedProgram(prog)
+                                    const cohorts = getCohortsForProgram(prog)
+                                    setSelectedCohort(cohorts[0])
+                                    setSelectedCourse(null)
                                   }
-                                  setSelectedCohort(null)
-                                  setSelectedCourse(null)
-                                } else if (sub === 'Curriculum') {
-                                  const prog = selectedProgram || INITIAL_PROGRAMS[1]
-                                  setSelectedProgram(prog)
-                                  const cohorts = getCohortsForProgram(prog)
-                                  setSelectedCohort(cohorts[0])
-                                  setSelectedCourse(null)
+                                } else {
+                                  setActiveTab(item.id)
+                                  setActiveSubItem(subLabel)
                                 }
                               }}
-                              className={`w-full text-left py-1.5 px-2 rounded-md text-[11px] transition-colors cursor-pointer ${
+                              className={`w-full text-left py-2 px-2.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-2.5 ${
                                 isSubActive
-                                  ? 'text-teal-700 font-semibold bg-white shadow-xs border border-teal-100'
-                                  : 'text-slate-500 hover:text-slate-800 hover:bg-white'
+                                  ? 'text-teal-700 font-semibold bg-teal-50 border border-teal-100/80 shadow-2xs'
+                                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                               }`}
                             >
-                              {sub}
+                              {SubIcon && (
+                                <SubIcon
+                                  className={`h-4 w-4 shrink-0 ${
+                                    isSubActive ? 'text-teal-600' : 'text-slate-400'
+                                  }`}
+                                />
+                              )}
+                              <span className="truncate">{subLabel}</span>
                             </button>
                           )
                         })}
@@ -1328,9 +1406,39 @@ export default function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          {selectedProgram ? (
+          {activeTab === 'access-management' ? (
+            activeSubItem === 'User Management' ? (
+              <UserManagementPage
+                onActionNotify={(msg) => setActionNotification(msg)}
+              />
+            ) : activeSubItem === 'Roles and Permission' ? (
+              <RolesAndPermissionsPage
+                onActionNotify={(msg) => setActionNotification(msg)}
+              />
+            ) : (
+              <AccessManagementSubView
+                viewId={activeSubItem}
+                onActionNotify={(msg) => setActionNotification(msg)}
+              />
+            )
+          ) : activeTab === 'student-experience' && activeSubItem === 'Competitions' ? (
+            <CompetitionManagementPage
+              onActionNotify={(msg) => setActionNotification(msg)}
+            />
+          ) : selectedProgram ? (
             selectedCohort ? (
-              selectedCourse ? (
+              isEditingCohort ? (
+                <EditCohortPage
+                  cohort={selectedCohort}
+                  programName={selectedProgram.name}
+                  onDiscard={() => setIsEditingCohort(false)}
+                  onSave={(updatedCohort) => {
+                    setSelectedCohort(updatedCohort)
+                    setIsEditingCohort(false)
+                    setActionNotification('Cohort details saved successfully.')
+                  }}
+                />
+              ) : selectedCourse ? (
                 /* View 4: Course Detail View (Harmonized to match Program and Cohort design system) */
                 <>
                   {/* Breadcrumbs with Teal Bar */}
@@ -1469,10 +1577,10 @@ export default function App() {
 
                   {/* Tabs Content */}
                   {activeCourseTab === 'sessions' ? (
-                    <div className="space-y-4">
-                      {/* Filter & Action Toolbar matching Cohort & Program toolbar style */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="relative w-full sm:w-64">
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden">
+                      {/* Unified sessions toolbar: search and collection actions */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 bg-white border-b border-gray-200">
+                        <div className="relative w-full sm:w-72">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                           <input
                             type="text"
@@ -1483,7 +1591,7 @@ export default function App() {
                           />
                         </div>
 
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
                           <button
                             onClick={() => setActionNotification('Schedule Sessions modal opened')}
                             className="bg-white border border-gray-200 hover:bg-slate-50 text-slate-700 font-medium px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-xs text-xs transition-colors cursor-pointer"
@@ -1501,20 +1609,25 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Sessions Split View */}
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Connected master-detail workspace */}
+                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] items-start">
                         {/* Left Column: Sessions List */}
-                        <div className="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden">
+                        <div className="bg-slate-50/40 border-b border-gray-200 lg:border-b-0 lg:border-r overflow-hidden">
                           <div className="px-4 py-3 bg-slate-50/70 border-b border-gray-100 flex items-center justify-between text-xs font-semibold text-slate-700">
-                            <span>Sessions List ({DEFAULT_SESSIONS.length})</span>
-                            <span className="text-[11px] font-normal text-slate-400">Chronological</span>
+                            <span>Sessions List ({filteredSessions.length})</span>
+                            <span className="text-[11px] font-normal text-slate-400">
+                              {normalizedSessionQuery ? `${filteredSessions.length} of ${DEFAULT_SESSIONS.length}` : 'Chronological'}
+                            </span>
                           </div>
-                          <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
-                            {DEFAULT_SESSIONS.filter((s) =>
-                              s.title.toLowerCase().includes(searchSessionQuery.toLowerCase()) ||
-                              s.topic.toLowerCase().includes(searchSessionQuery.toLowerCase()) ||
-                              `session ${s.sessionNum}`.toLowerCase().includes(searchSessionQuery.toLowerCase())
-                            ).map((session) => {
+                          <div className="divide-y divide-gray-100 max-h-[720px] overflow-y-auto">
+                            {filteredSessions.length === 0 && (
+                              <div className="px-5 py-12 text-center">
+                                <Search className="h-5 w-5 text-slate-300 mx-auto mb-2" />
+                                <p className="text-xs font-semibold text-slate-700">No sessions found</p>
+                                <p className="text-[11px] text-slate-400 mt-1">Try a title, topic, or session number.</p>
+                              </div>
+                            )}
+                            {filteredSessions.map((session) => {
                               const isSelected = selectedSessionId === session.id
                               return (
                                 <div
@@ -1586,9 +1699,9 @@ export default function App() {
                         </div>
 
                         {/* Right Column: Selected Session Detail View */}
-                        <div className="lg:col-span-8">
+                        <div className="min-w-0 bg-white">
                           {currentSession && (
-                            <div className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden">
+                            <div className="overflow-hidden">
                               {/* 1. Header & Title Section with Smart Compact Governance Controls */}
                               <div className="p-4 sm:p-4.5 space-y-2.5">
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5">
@@ -1690,104 +1803,111 @@ export default function App() {
                                   </div>
                                 </div>
 
-                                {/* Smart Streamlined Governance Bar (Single Line, Zero Wrapping) */}
-                                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100">
-                                  {/* Left: Feedback Controls Group */}
-                                  <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-                                    {/* Enable Feedback Micro-Toggle */}
-                                    <div
+                                {/* Feedback governance: settings left, actions right */}
+                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-3 border-t border-gray-100">
+                                  {/* Configuration group */}
+                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                      Feedback settings
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      role="switch"
+                                      aria-checked={feedbackEnabled}
                                       onClick={() => {
                                         const next = !feedbackEnabled
                                         setFeedbackEnabled(next)
                                         setActionNotification(next ? 'Feedback collection enabled for session' : 'Feedback collection disabled')
                                       }}
-                                      className="flex items-center gap-1.5 cursor-pointer select-none group"
+                                      className="flex items-center gap-2 cursor-pointer select-none group"
                                     >
                                       <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">
-                                        Enable Feedback
+                                        Collection
                                       </span>
-                                      <div
-                                        className={`w-7 h-4 rounded-full relative flex items-center p-0.5 transition-colors duration-200 ${
+                                      <span
+                                        className={`w-8 h-[18px] rounded-full relative flex items-center p-0.5 transition-colors duration-200 ${
                                           feedbackEnabled ? 'bg-teal-600' : 'bg-slate-300'
                                         }`}
                                       >
-                                        <div
-                                          className={`w-3 h-3 rounded-full bg-white shadow-2xs transform transition-transform duration-200 ${
-                                            feedbackEnabled ? 'translate-x-3' : 'translate-x-0'
+                                        <span
+                                          className={`w-3.5 h-3.5 rounded-full bg-white shadow-2xs transform transition-transform duration-200 ${
+                                            feedbackEnabled ? 'translate-x-3.5' : 'translate-x-0'
                                           }`}
                                         />
-                                      </div>
-                                    </div>
+                                      </span>
+                                    </button>
 
-                                    {/* Conditional controls when Enable Feedback is ON */}
                                     {feedbackEnabled && (
-                                      <div className="flex items-center gap-2.5 pl-2.5 border-l border-gray-200 animate-in fade-in duration-200">
-                                        {/* Mandatory Feedback Micro-Toggle with Hover Tooltip */}
-                                        <div className="relative group/mandatory flex items-center gap-1.5">
-                                          <div
-                                            onClick={() => {
-                                              const next = !mandatoryFeedback
-                                              setMandatoryFeedback(next)
-                                              setActionNotification(
-                                                next
-                                                  ? 'Mandatory feedback enabled: Attendance linked to feedback submission'
-                                                  : 'Mandatory feedback disabled'
-                                              )
-                                            }}
-                                            className="flex items-center gap-1.5 cursor-pointer select-none"
-                                          >
-                                            <span className="text-xs font-semibold text-slate-700 hover:text-slate-900 transition-colors flex items-center gap-1">
-                                              <span>Mandatory Feedback</span>
-                                              <Info className="h-3 w-3 text-slate-400 group-hover/mandatory:text-teal-600 transition-colors" />
-                                            </span>
-                                            <div
-                                              className={`w-7 h-4 rounded-full relative flex items-center p-0.5 transition-colors duration-200 ${
-                                                mandatoryFeedback ? 'bg-teal-600' : 'bg-slate-300'
-                                              }`}
-                                            >
-                                              <div
-                                                className={`w-3 h-3 rounded-full bg-white shadow-2xs transform transition-transform duration-200 ${
-                                                  mandatoryFeedback ? 'translate-x-3' : 'translate-x-0'
-                                                }`}
-                                              />
-                                            </div>
-                                          </div>
-
-                                          {/* Hover Tooltip as specifically requested */}
-                                          <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 p-2 bg-slate-900 text-white text-[11px] leading-snug rounded-lg shadow-xl opacity-0 group-hover/mandatory:opacity-100 transition-opacity duration-200 z-50 text-center">
-                                            Student attendance will only be marked Present upon successful feedback submission.
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                          </div>
-                                        </div>
-
-                                        {/* Show Feedback QR Button */}
+                                      <div className="relative group/mandatory flex items-center gap-2 pl-3 border-l border-gray-200 animate-in fade-in duration-200">
                                         <button
-                                          onClick={() => setQrModalType('feedback')}
-                                          className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-teal-300 bg-teal-50/80 hover:bg-teal-100 text-teal-700 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
-                                          title="Show dynamic feedback QR code for students"
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={mandatoryFeedback}
+                                          onClick={() => {
+                                            const next = !mandatoryFeedback
+                                            setMandatoryFeedback(next)
+                                            setActionNotification(
+                                              next
+                                                ? 'Mandatory feedback enabled: Attendance linked to feedback submission'
+                                                : 'Mandatory feedback disabled'
+                                            )
+                                          }}
+                                          className="flex items-center gap-2 cursor-pointer select-none"
                                         >
-                                          <QrCode className="h-3 w-3 text-teal-600" />
-                                          <span>Feedback QR</span>
+                                          <span className="text-xs font-semibold text-slate-700 hover:text-slate-900 transition-colors flex items-center gap-1">
+                                            <span>Required for attendance</span>
+                                            <Info className="h-3 w-3 text-slate-400 group-hover/mandatory:text-teal-600 transition-colors" />
+                                          </span>
+                                          <span
+                                            className={`w-8 h-[18px] rounded-full relative flex items-center p-0.5 transition-colors duration-200 ${
+                                              mandatoryFeedback ? 'bg-teal-600' : 'bg-slate-300'
+                                            }`}
+                                          >
+                                            <span
+                                              className={`w-3.5 h-3.5 rounded-full bg-white shadow-2xs transform transition-transform duration-200 ${
+                                                mandatoryFeedback ? 'translate-x-3.5' : 'translate-x-0'
+                                              }`}
+                                            />
+                                          </span>
                                         </button>
+
+                                        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 p-2 bg-slate-900 text-white text-[11px] leading-snug rounded-lg shadow-xl opacity-0 group-hover/mandatory:opacity-100 transition-opacity duration-200 z-50 text-center">
+                                          Student attendance will only be marked Present upon successful feedback submission.
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                        </div>
                                       </div>
                                     )}
                                   </div>
 
-                                  {/* Right: View Feedback CTA with Star Rating (3.2) */}
-                                  <button
-                                    onClick={() => {
-                                      setIsFeedbackDrawerOpen(true)
-                                      setActionNotification(`Viewing student feedback for: ${currentSession.title}`)
-                                    }}
-                                    className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-semibold transition-colors cursor-pointer shadow-2xs group/rating"
-                                    title={`View student feedback (${currentSession.feedbackRating || 3.2}/5.0)`}
-                                  >
-                                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500 shrink-0" />
-                                    <span>View Feedback</span>
-                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-950 font-bold text-[10px] ml-0.5">
-                                      {currentSession.feedbackRating !== undefined ? currentSession.feedbackRating.toFixed(1) : '3.2'}
-                                    </span>
-                                  </button>
+                                  {/* Student access and results actions */}
+                                  <div className="flex items-center gap-2 self-start lg:self-auto">
+                                    {feedbackEnabled && (
+                                      <button
+                                        onClick={() => setQrModalType('feedback')}
+                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-teal-200 bg-teal-50/80 hover:bg-teal-100 text-teal-700 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                                        title="Show dynamic feedback QR code for students"
+                                      >
+                                        <QrCode className="h-3.5 w-3.5 text-teal-600" />
+                                        <span>Share QR</span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      onClick={() => {
+                                        setIsFeedbackDrawerOpen(true)
+                                        setActionNotification(`Viewing student feedback for: ${currentSession.title}`)
+                                      }}
+                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-semibold transition-colors cursor-pointer shadow-2xs group/rating"
+                                      title={`View student feedback (${currentSession.feedbackRating || 3.2}/5.0)`}
+                                    >
+                                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500 shrink-0" />
+                                      <span>View responses</span>
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-200/80 text-amber-950 font-bold text-[10px]">
+                                        {currentSession.feedbackRating !== undefined ? currentSession.feedbackRating.toFixed(1) : '3.2'}
+                                      </span>
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
 
@@ -2289,6 +2409,7 @@ export default function App() {
                       <FileText className="h-4 w-4" />
                     </button>
                     <button
+                      onClick={() => setIsEditingCohort(true)}
                       className="p-2 rounded-lg border border-gray-200 bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
                       title="Edit Cohort"
                     >
@@ -2995,19 +3116,21 @@ export default function App() {
       </div>
 
       {/* Floating Chatbot Widget: Coach Bug Bot */}
-      <div className="fixed bottom-6 right-6 flex items-center gap-2 z-40">
-        <div className="relative">
-          <div className="absolute -top-7 right-0 bg-slate-800 text-white text-[10px] font-semibold px-2 py-0.5 rounded shadow whitespace-nowrap">
-            Coach Bug Bot
+      {activeTab !== 'access-management' && (
+        <div className="fixed bottom-6 right-6 flex items-center gap-2 z-40">
+          <div className="relative">
+            <div className="absolute -top-7 right-0 bg-slate-800 text-white text-[10px] font-semibold px-2 py-0.5 rounded shadow whitespace-nowrap">
+              Coach Bug Bot
+            </div>
+            <button className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-teal-700 hover:bg-teal-800 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 cursor-pointer">
+              <MessageCircle className="h-6 w-6" />
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white ring-2 ring-white">
+                1
+              </span>
+            </button>
           </div>
-          <button className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-teal-700 hover:bg-teal-800 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 cursor-pointer">
-            <MessageCircle className="h-6 w-6" />
-            <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white ring-2 ring-white">
-              1
-            </span>
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Toast Notification for Action Menu Feedback */}
       {actionNotification && (
